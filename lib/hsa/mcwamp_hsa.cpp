@@ -111,7 +111,7 @@ static const char* getHSAErrorString(hsa_status_t s) {
     return error_string;
 }
 
-#define STATUS_CHECK(s,line) if (s != HSA_STATUS_SUCCESS) {\
+#define STATUS_CHECK(s,line) if (s != HSA_STATUS_SUCCESS && s != HSA_STATUS_INFO_BREAK) {\
     const char* error_string = getHSAErrorString(s);\
 		printf("### Error: %s (%d) at line:%d\n", error_string, s, line);\
                 assert(HSA_STATUS_SUCCESS == hsa_shut_down());\
@@ -2010,6 +2010,21 @@ class HSAContext final : public KalmarContext
     int signalCursor;
     std::mutex signalPoolMutex;
 
+    /// Determines if the given agent is of type HSA_DEVICE_TYPE_CPU
+    static hsa_status_t find_cpu(hsa_agent_t agent, void *data) {
+        hsa_device_type_t device_type;
+        hsa_status_t status = hsa_agent_get_info(agent, HSA_AGENT_INFO_DEVICE, &device_type);
+        if (status != HSA_STATUS_SUCCESS) {
+            return status;
+        }
+        if (device_type == HSA_DEVICE_TYPE_CPU) {
+            (*static_cast<hsa_agent_t*>(data)) = agent;
+            return HSA_STATUS_INFO_BREAK;
+        }
+
+        return HSA_STATUS_SUCCESS;
+    }
+
     /// Determines if the given agent is of type HSA_DEVICE_TYPE_GPU
     static hsa_status_t find_gpu(hsa_agent_t agent, void *data) {
         hsa_status_t status;
@@ -2062,26 +2077,22 @@ public:
         status = hsa_init();
         STATUS_CHECK(status, __LINE__);
 
-        // Iterate over the agents
+        // Iterate over GPU agents
         std::vector<hsa_agent_t> agents;
         status = hsa_iterate_agents(&HSAContext::find_gpu, &agents);
         STATUS_CHECK(status, __LINE__);
 
-        bool cpu_agent_found = false;
         for (int i = 0; i < agents.size(); ++i) {
             hsa_agent_t agent = agents[i];
-            hsa_device_type_t device_type = HSA_DEVICE_TYPE_GPU;
-            hsa_status_t status = hsa_agent_get_info(agent, HSA_AGENT_INFO_DEVICE, &device_type);
-            if (!cpu_agent_found && (device_type == HSA_DEVICE_TYPE_CPU)) {
-                g_cpu_agent = agent;
-                cpu_agent_found = true;
-            }
-
             auto Dev = new HSADevice(agent);
             if (i == 0)
                 def = Dev;
             Devices.push_back(Dev);
         }
+
+        // Iterate over CPU agents
+        status = hsa_iterate_agents(&HSAContext::find_cpu, &g_cpu_agent);
+        STATUS_CHECK(status, __LINE__);
 
 #if SIGNAL_POOL_SIZE > 0
         signalPoolMutex.lock();
