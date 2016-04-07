@@ -1011,6 +1011,9 @@ public:
     // synchronous copy
     // the implementation is based on asynchronus HSACopy
     void copy(const void *src, void *dst, size_t size_bytes) override {
+#if KALMAR_DEBUG
+        std::cerr << "HSAQueue::copy(" << src << ", " << dst << ", " << size_bytes << ")\n";
+#endif
         // wait for all previous async commands in this queue to finish
         this->wait();
 
@@ -1021,6 +1024,10 @@ public:
         copyCommand->syncCopy(this);
 
         delete(copyCommand);
+
+#if KALMAR_DEBUG
+        std::cerr << "HSAQueue::copy() complete\n";
+#endif
     }
 
     // remove finished async operation from waiting list
@@ -2925,6 +2932,10 @@ HSACopy::setCopyAgents(Kalmar::hcMemcpyKind copyDir, hsa_agent_t *srcAgent, hsa_
 void
 HSACopy::syncCopy(Kalmar::HSAQueue* hsaQueue) {
 
+#if KALMAR_DEBUG
+    std::cerr << "HSACopy::syncCopy(" << hsaQueue << "), src = " << src << ", dst = " << dst << ", sizeBytes = " << sizeBytes << "\n";
+#endif
+
     // query if src and dst are on device memory or pinned host memory
     bool srcIsMapped = false;
     bool srcInDeviceMem = false;
@@ -2949,6 +2960,13 @@ HSACopy::syncCopy(Kalmar::HSAQueue* hsaQueue) {
         } // Else - dstNotMapped=dstInDeviceMem=false
     }
 
+#if KALMAR_DEBUG
+    std::cerr << "srcIsMapped: " << srcIsMapped << "\n";
+    std::cerr << "srcInDeviceMem: " << srcInDeviceMem << "\n";
+    std::cerr << "dstIsMapped: " << dstIsMapped << "\n";
+    std::cerr << "dstInDeviceMem: " << dstInDeviceMem << "\n";
+#endif
+
     // Resolve default to a specific Kind so we know which algorithm to use:
     Kalmar::hcMemcpyKind copyDir;
     if (!srcInDeviceMem && !dstInDeviceMem) {
@@ -2964,6 +2982,10 @@ HSACopy::syncCopy(Kalmar::HSAQueue* hsaQueue) {
         throw Kalmar::runtime_exception("invalid copy copyDir", 0);
     }
 
+#if KALMAR_DEBUG
+    std::cerr << "hcMemcpyKind: " << copyDir << "\n";
+#endif
+
     // do not mark any dependent signals as of now
     hsa_signal_t depSignal;
     int depSignalCnt = 0;
@@ -2976,15 +2998,27 @@ HSACopy::syncCopy(Kalmar::HSAQueue* hsaQueue) {
     Kalmar::HSADevice *device = static_cast<Kalmar::HSADevice*> (hsaQueue->getDev());
 
     // Need to use staging buffer if copying to or from unmapped host memory:
-    if ((copyDir == Kalmar::hcMemcpyHostToDevice) && (! srcIsMapped)) {
+    if ((copyDir == Kalmar::hcMemcpyHostToDevice) && (!srcIsMapped)) {
+#if KALMAR_DEBUG
+    std::cerr << "HSACopy::syncCopy(), invoke StagingBuffer::CopyHostToDevice()\n";
+#endif
         device->staging_buffer[0]->CopyHostToDevice(dst, src, sizeBytes, depSignalCnt ? &depSignal : NULL);
     } else if ((copyDir == Kalmar::hcMemcpyDeviceToHost) && (!dstIsMapped)) {
-        //printf ("staged-copy- read dep signals\n");
+#if KALMAR_DEBUG
+    std::cerr << "HSACopy::syncCopy(), invoke StagingBuffer::CopyDeviceToHost()\n";
+#endif
         device->staging_buffer[1]->CopyDeviceToHost(dst, src, sizeBytes, depSignalCnt ? &depSignal : NULL);
     } else if (copyDir == Kalmar::hcMemcpyHostToHost)  {
+#if KALMAR_DEBUG
+    std::cerr << "HSACopy::syncCopy(), invoke memcpy\n";
+#endif
         // This works for both mapped and unmapped memory:
         memcpy(dst, src, sizeBytes);
     } else {
+
+#if KALMAR_DEBUG
+    std::cerr << "HSACopy::syncCopy(), fetch and init a HSA signal\n";
+#endif
         // If not special case - these can all be handled by the hsa async copy:
         hsa_agent_t srcAgent, dstAgent;
         setCopyAgents(copyDir, &srcAgent, &dstAgent);
@@ -2996,11 +3030,25 @@ HSACopy::syncCopy(Kalmar::HSAQueue* hsaQueue) {
 
         hsa_signal_store_relaxed(signal, 1);
 
+#if KALMAR_DEBUG
+    std::cerr << "HSACopy::syncCopy(), invoke hsa_amd_memory_async_copy()\n";
+#endif
+
         hsa_status_t hsa_status = hsa_amd_memory_async_copy(dst, dstAgent, src, srcAgent, sizeBytes, depSignalCnt, depSignalCnt ? &depSignal:NULL, signal);
 
         if (hsa_status == HSA_STATUS_SUCCESS) {
+#if KALMAR_DEBUG
+    std::cerr << "HSACopy::syncCopy(), wait for completion...";
+#endif
             hsa_signal_wait_relaxed(signal, HSA_SIGNAL_CONDITION_LT, 1, UINT64_MAX, waitMode);
+
+#if KALMAR_DEBUG
+    std::cerr << "done!\n";
+#endif
         } else {
+#if KALMAR_DEBUG
+    std::cerr << "HSACopy::syncCopy(), hsa_amd_memory_async_copy() returns: " << hsa_status << "\n";
+#endif
             throw Kalmar::runtime_exception("hsa_amd_memory_async_copy error", hsa_status);
         }
         Kalmar::ctx.releaseSignal(signal, signalIndex);
