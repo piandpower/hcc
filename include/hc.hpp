@@ -239,6 +239,20 @@ public:
     completion_future create_marker();
 
     /**
+     * This command inserts a marker event into the accelerator_view's command
+     * queue with a prior dependent asynchronous event.
+     *
+     * This marker is returned as a completion_future object. When its
+     * dependent event and all commands submitted prior to the marker event
+     * creation have been completed, the future is ready.
+     *
+     * @return A future which can be waited on, and will block until the
+     *         current batch of commands, plus the dependent event have
+     *         been completed.
+     */
+    completion_future create_blocking_marker(completion_future& dependent_future);
+
+    /**
      * Copies size_bytes bytes from src to dst.  
      * Src and dst must not overlap.  
      * Note the src is the first parameter and dst is second, following C++ convention.
@@ -1116,6 +1130,10 @@ inline accelerator accelerator_view::get_accelerator() const { return pQueue->ge
 
 inline completion_future accelerator_view::create_marker() {
     return completion_future(pQueue->EnqueueMarker());
+}
+
+inline completion_future accelerator_view::create_blocking_marker(completion_future& dependent_future) {
+    return completion_future(pQueue->EnqueueMarkerWithDependency(dependent_future.get_native_handle()));
 }
 
 inline completion_future accelerator_view::copy_async(const void *src, void *dst, size_t size_bytes) {
