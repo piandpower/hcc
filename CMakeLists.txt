@@ -274,12 +274,14 @@ if (HSA_USE_AMDGPU_BACKEND)
   set(HAS_HSA_HOF 0)
 endif ()
 
-set(HSA_AMDGPU_GPU_TARGET "auto" CACHE STRING "Target GPU device (kaveri,carrizo,fiji,hawaii)")
+set(HSA_AMDGPU_GPU_TARGET "auto" CACHE STRING "Target GPU device (kaveri,carrizo,fiji,hawaii,polaris10,polaris11)")
 
 if (NOT (HSA_AMDGPU_GPU_TARGET STREQUAL "kaveri" OR
          HSA_AMDGPU_GPU_TARGET STREQUAL "carrizo" OR
          HSA_AMDGPU_GPU_TARGET STREQUAL "fiji" OR
          HSA_AMDGPU_GPU_TARGET STREQUAL "hawaii" OR
+         HSA_AMDGPU_GPU_TARGET STREQUAL "polaris10" OR
+         HSA_AMDGPU_GPU_TARGET STREQUAL "polaris11" OR
          HSA_AMDGPU_GPU_TARGET STREQUAL "auto"))
   MESSAGE(FATAL_ERROR "${HSA_AMDGPU_GPU_TARGET} is not a valid GPU")
 endif()

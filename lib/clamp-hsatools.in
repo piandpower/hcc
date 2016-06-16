@@ -22,8 +22,8 @@ fi
 
 # check command line argument
 if [ "$#" -lt 1 ]; then
-  echo "Usage: $0 input_LLVM_IR (--amdgpu-target=(fiji | kaveri | carrizo | hawaii))" >&2
-  echo "  --amdgpu-target=(fiji | kaveri | carrizo | hawaii)" >&2
+  echo "Usage: $0 input_LLVM_IR (--amdgpu-target=(fiji | kaveri | carrizo | hawaii | polaris10 | polaris11))" >&2
+  echo "  --amdgpu-target=(fiji | kaveri | carrizo | hawaii | polaris10 | polaris11)" >&2
   echo "           selects AMDGPU target" >&2
   exit 1
 fi
@@ -93,6 +93,10 @@ deviceIdToGpuName() {
             platformName="fiji" ;;
         67a0 | 67a1 | 67a2 | 67a8 | 67a9 | 67aa | 67b0 | 67b1 | 67b8 | 67b9 | 67ba | 67be )
             platformName="hawaii" ;;
+        67e0 | 67e3 | 67e8 | 67eb | 67ef | 67ff | 67e1 | 67e7 | 67e9 )
+            platformName="polaris11" ;;
+        67c0 | 67c1 | 67c2 | 67c4 | 67c7 | 67df | 67c8 | 67c9 | 67ca | 67cc | 67cf )
+            platformName="polaris10" ;;
         * )
             echo "Warning: failed to autodetect target, defaulting to fiji"
             platformName="fiji" ;;

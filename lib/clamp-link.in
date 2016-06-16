@@ -564,6 +564,12 @@ if [ -n "$LINK_KERNEL_ARGS" ]; then
           hawaii)
             HOF_ARCH="7:0:1"
           ;;
+          polaris10)
+            HOF_ARCH="8:0:1"
+          ;;
+          polaris11)
+            HOF_ARCH="8:0:1"
+          ;;
         esac
 
         # conduct HSA offline finalization for DGPU
